@@ -1,0 +1,14 @@
+{
+  "name": "parking-finder-de",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Repo-level tooling (commit linting). App code lives in backend/, data-pipeline/, frontend/.",
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.6"
+  },
+  "scripts": {
+    "prepare": "husky"
+  }
+}
