@@ -65,8 +65,12 @@ def save(city: str, data: list[dict]) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch OSM parking:condition data for a German city")
-    parser.add_argument("--city", default="Köln", help="City name as it appears in OSM (default: Köln)")
+    parser = argparse.ArgumentParser(
+        description="Fetch OSM parking:condition data for a German city"
+    )
+    parser.add_argument(
+        "--city", default="Köln", help="City name as it appears in OSM (default: Köln)"
+    )
     args = parser.parse_args()
 
     print(f"Fetching OSM parking:condition ways for {args.city}...")

@@ -74,7 +74,8 @@ def load_osm_segments(conn) -> int:
             cur.execute(
                 """
                 INSERT INTO parking_segments
-                    (osm_id, city, name, geometry, primary_condition_type, raw_condition_tags, source)
+                    (osm_id, city, name, geometry, primary_condition_type,
+                     raw_condition_tags, source)
                 VALUES
                     (%s, %s, %s, ST_SetSRID(ST_GeomFromText(%s), 4326), %s, %s, 'osm')
                 """,
