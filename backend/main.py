@@ -1,4 +1,4 @@
-"""Parking Finder API — serves parking_segments and permit_zones as GeoJSON.
+"""Parking Finder API - serves parking_segments and permit_zones as GeoJSON.
 
 No bounding-box filtering: at 618 segments + 47 zones for Köln, a full-city
 response loads instantly. That's a scaling concern for a much larger dataset
@@ -82,7 +82,11 @@ def get_segments(city: str = "Köln", condition_type: str | None = None):
         }
         for row in rows
     ]
-    return {"type": "FeatureCollection", "attribution": ATTRIBUTION, "features": features}
+    return {
+        "type": "FeatureCollection",
+        "attribution": ATTRIBUTION,
+        "features": features,
+    }
 
 
 @app.get("/api/zones")
@@ -115,4 +119,8 @@ def get_zones(city: str = "Köln"):
         }
         for row in rows
     ]
-    return {"type": "FeatureCollection", "attribution": ATTRIBUTION, "features": features}
+    return {
+        "type": "FeatureCollection",
+        "attribution": ATTRIBUTION,
+        "features": features,
+    }

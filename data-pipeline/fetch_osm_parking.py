@@ -1,6 +1,6 @@
 """Pull OSM parking:condition:* tagged street segments for a German city via the Overpass API.
 
-This script only extracts and saves raw data — it does not decide what counts as
+This script only extracts and saves raw data - it does not decide what counts as
 free/paid/permit. That mapping happens later, in the transform/load step, once
 we're looking at both this and the city's official zone data together.
 """
@@ -44,7 +44,9 @@ def extract_relevant_fields(ways: list[dict]) -> list[dict]:
     for way in ways:
         tags = way.get("tags", {})
         condition_tags = {
-            key: value for key, value in tags.items() if key.startswith("parking:condition")
+            key: value
+            for key, value in tags.items()
+            if key.startswith("parking:condition")
         }
         extracted.append(
             {
@@ -60,7 +62,9 @@ def extract_relevant_fields(ways: list[dict]) -> list[dict]:
 def save(city: str, data: list[dict]) -> Path:
     OUTPUT_DIR.mkdir(exist_ok=True)
     out_path = OUTPUT_DIR / f"osm_parking_{city.lower()}.json"
-    out_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return out_path
 
 

@@ -36,7 +36,7 @@ def fetch_zones() -> dict:
 
 
 def reproject_coordinates(coords: list) -> list:
-    """Recursively reproject nested coordinate lists — handles Polygon/MultiPolygon rings
+    """Recursively reproject nested coordinate lists - handles Polygon/MultiPolygon rings
     without needing separate logic per geometry type."""
     if isinstance(coords[0], (int, float)):
         lon, lat = transformer.transform(coords[0], coords[1])
@@ -48,14 +48,19 @@ def reproject_feature_collection(geojson: dict) -> dict:
     for feature in geojson["features"]:
         geometry = feature["geometry"]
         geometry["coordinates"] = reproject_coordinates(geometry["coordinates"])
-    geojson["crs"] = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::4326"}}
+    geojson["crs"] = {
+        "type": "name",
+        "properties": {"name": "urn:ogc:def:crs:EPSG::4326"},
+    }
     return geojson
 
 
 def save(geojson: dict) -> Path:
     OUTPUT_DIR.mkdir(exist_ok=True)
     out_path = OUTPUT_DIR / "cologne_bewohnerparkgebiete.geojson"
-    out_path.write_text(json.dumps(geojson, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_path.write_text(
+        json.dumps(geojson, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
     return out_path
 
 
