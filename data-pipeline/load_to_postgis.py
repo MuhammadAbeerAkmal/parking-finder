@@ -1,10 +1,11 @@
 """Transform the raw OSM + Cologne WFS output into the PostGIS schema.
 
 This is the only place that interprets raw parking:condition:* tags into a
-single primary_condition_type for map coloring — extraction scripts stay dumb,
+single primary_condition_type for map coloring - extraction scripts stay dumb,
 this script is where meaning gets assigned.
 """
 
+import argparse
 import json
 import os
 from pathlib import Path
@@ -26,10 +27,8 @@ DB_CONFIG = {
     "password": os.environ["POSTGRES_PASSWORD"],
 }
 
-CITY = "Köln"
-
 # Preference order when a way has multiple condition tags (e.g. both "both" and
-# side-specific keys) — take the first match as the representative value.
+# side-specific keys) - take the first match as the representative value.
 CONDITION_KEY_PRIORITY = [
     "parking:condition:both",
     "parking:condition:left",
@@ -59,13 +58,13 @@ def primary_condition_type(condition_tags: dict) -> str | None:
     return None
 
 
-def load_osm_segments(conn) -> int:
-    path = OUTPUT_DIR / "osm_parking_köln.json"
+def load_osm_segments(conn, city: str) -> int:
+    path = OUTPUT_DIR / f"osm_parking_{city.lower()}.json"
     ways = json.loads(path.read_text(encoding="utf-8"))
 
     with conn.cursor() as cur:
         cur.execute(
-            "DELETE FROM parking_segments WHERE city = %s AND source = 'osm'", (CITY,)
+            "DELETE FROM parking_segments WHERE city = %s AND source = 'osm'", (city,)
         )
         for way in ways:
             if len(way["geometry"]) < 2:
@@ -81,7 +80,7 @@ def load_osm_segments(conn) -> int:
                 """,
                 (
                     way["osm_id"],
-                    CITY,
+                    city,
                     way["name"],
                     wkt,
                     primary_condition_type(way["condition_tags"]),
@@ -92,14 +91,19 @@ def load_osm_segments(conn) -> int:
     return len(ways)
 
 
-def load_permit_zones(conn) -> int:
+def load_permit_zones(conn, city: str) -> int:
+    # Unlike the OSM path above, this filename stays Cologne-specific rather
+    # than being derived from `city` - every city's WFS output has a
+    # different shape (see fetch_cologne_wfs.py), so there's no real
+    # per-city naming convention to generalize to yet. Phase 3 defines one
+    # when a second city's WFS script actually gets written.
     path = OUTPUT_DIR / "cologne_bewohnerparkgebiete.geojson"
     geojson = json.loads(path.read_text(encoding="utf-8"))
     features = geojson["features"]
 
     with conn.cursor() as cur:
         cur.execute(
-            "DELETE FROM permit_zones WHERE city = %s AND source = 'city_wfs'", (CITY,)
+            "DELETE FROM permit_zones WHERE city = %s AND source = 'city_wfs'", (city,)
         )
         for feature in features:
             props = feature["properties"]
@@ -111,7 +115,7 @@ def load_permit_zones(conn) -> int:
                     (%s, %s, %s, %s, ST_SetSRID(ST_GeomFromGeoJSON(%s), 4326), 'city_wfs')
                 """,
                 (
-                    CITY,
+                    city,
                     props.get("Name"),
                     props.get("Abkürzung"),
                     props.get("Weitere_Informationen"),
@@ -123,17 +127,25 @@ def load_permit_zones(conn) -> int:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Load fetched OSM + WFS data for a city into PostGIS"
+    )
+    parser.add_argument(
+        "--city", default="Köln", help="City name to tag rows with (default: Köln)"
+    )
+    args = parser.parse_args()
+
     conn = get_connection()
     try:
         print("Applying schema...")
         apply_schema(conn)
 
-        print("Loading OSM parking segments...")
-        segment_count = load_osm_segments(conn)
+        print(f"Loading OSM parking segments for {args.city}...")
+        segment_count = load_osm_segments(conn, args.city)
         print(f"Loaded {segment_count} segments.")
 
-        print("Loading Cologne permit zones...")
-        zone_count = load_permit_zones(conn)
+        print(f"Loading {args.city} permit zones...")
+        zone_count = load_permit_zones(conn, args.city)
         print(f"Loaded {zone_count} zones.")
     finally:
         conn.close()

@@ -10,7 +10,7 @@ __pycache__/
 node_modules/
 dist/
 
-# Fetched/derived data — regenerable by running the data-pipeline scripts
+# Fetched/derived data - regenerable by running the data-pipeline scripts
 data-pipeline/output/
 
 # Editor / OS
