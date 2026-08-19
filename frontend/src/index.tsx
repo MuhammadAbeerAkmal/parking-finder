@@ -15,3 +15,13 @@ if (!container) {
 
 const root = createRoot(container);
 root.render(<App />);
+
+// Only actually exists in production builds (see webpack.config.js) - a
+// no-op 404 in dev, not worth branching on here.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+      /* not present in dev builds - expected */
+    });
+  });
+}

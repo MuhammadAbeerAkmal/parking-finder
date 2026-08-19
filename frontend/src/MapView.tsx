@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Map as MapLibreMap, StyleSpecification } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useParkingData } from "./useParkingData";
+import InfoBar from "./InfoBar";
+import SegmentDetailPanel, { SelectedFeature } from "./SegmentDetailPanel";
 
-// Raw OSM tile server — fine for local dev, but has usage-policy limits for
+// Raw OSM tile server - fine for local dev, but has usage-policy limits for
 // real traffic. Before a real launch this should move to a proper tile
 // provider (MapTiler free tier, Stadia Maps, or self-hosted).
 const OSM_STYLE: StyleSpecification = {
@@ -30,10 +32,26 @@ const CONDITION_COLORS: Record<string, string> = {
 };
 const DEFAULT_SEGMENT_COLOR = "#757575";
 
+// MapLibre serializes nested-object properties on GeoJSON-source features to
+// JSON strings (vector-tile encoding only supports flat primitives), so
+// condition_tags needs parsing back out rather than being a real object here.
+function parseConditionTags(raw: unknown): Record<string, string> {
+  if (typeof raw !== "string") return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
 export default function MapView(): JSX.Element {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [layersReady, setLayersReady] = useState(false);
+  const [showFreeOnly, setShowFreeOnly] = useState(false);
+  const [selectedFeature, setSelectedFeature] =
+    useState<SelectedFeature | null>(null);
   const parkingData = useParkingData();
 
   // Create the map once.
@@ -66,7 +84,27 @@ export default function MapView(): JSX.Element {
     };
   }, []);
 
-  // Add data layers once both the map has loaded and the data has arrived.
+  // Try to center on the user's real location. Falls back to Cologne
+  // silently on denial/error/timeout - the InfoBar already makes clear that
+  // a sparse/empty view means "not checked yet," not "confirmed free," so
+  // showing the user's actual (possibly data-sparse) area is fine now.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded || !navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        map.setCenter([position.coords.longitude, position.coords.latitude]);
+        map.setZoom(15);
+      },
+      () => {
+        /* denied or unavailable - stay on the Cologne default */
+      },
+      { timeout: 8000 },
+    );
+  }, [mapLoaded]);
+
+  // Add data layers + interactions once both the map has loaded and the data has arrived.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded || !parkingData || map.getSource("zones")) return;
@@ -109,7 +147,68 @@ export default function MapView(): JSX.Element {
         ],
       },
     });
+
+    const interactiveLayers = ["segments-line", "zones-fill"];
+    for (const layerId of interactiveLayers) {
+      map.on("mouseenter", layerId, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", layerId, () => {
+        map.getCanvas().style.cursor = "";
+      });
+    }
+
+    map.on("click", "segments-line", (e) => {
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
+      setSelectedFeature({
+        kind: "segment",
+        name: props.name ?? null,
+        conditionType: props.condition_type ?? null,
+        conditionTags: parseConditionTags(props.condition_tags),
+      });
+    });
+
+    map.on("click", "zones-fill", (e) => {
+      const props = e.features?.[0]?.properties;
+      if (!props) return;
+      setSelectedFeature({
+        kind: "zone",
+        zoneName: props.zone_name ?? null,
+        zoneAbbreviation: props.zone_abbreviation ?? null,
+        infoUrl: props.info_url ?? null,
+      });
+    });
+
+    setLayersReady(true);
   }, [mapLoaded, parkingData]);
 
-  return <div ref={mapContainer} style={{ width: "100%", height: "100vh" }} />;
+  // "Show only confirmed-free" filter - hides everything else rather than
+  // just streets, since a visible permit zone while filtering for "free"
+  // would read as contradictory.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !layersReady) return;
+
+    map.setFilter(
+      "segments-line",
+      showFreeOnly ? ["==", ["get", "condition_type"], "free"] : null,
+    );
+    const zonesVisibility = showFreeOnly ? "none" : "visible";
+    map.setLayoutProperty("zones-fill", "visibility", zonesVisibility);
+    map.setLayoutProperty("zones-outline", "visibility", zonesVisibility);
+  }, [showFreeOnly, layersReady]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100vh" }}>
+      <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
+      <InfoBar showFreeOnly={showFreeOnly} onToggleFreeOnly={setShowFreeOnly} />
+      {selectedFeature && (
+        <SegmentDetailPanel
+          feature={selectedFeature}
+          onClose={() => setSelectedFeature(null)}
+        />
+      )}
+    </div>
+  );
 }

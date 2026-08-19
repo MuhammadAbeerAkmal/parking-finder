@@ -2,8 +2,9 @@ const path = require("path");
 const webpack = require("webpack");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
+const { GenerateSW } = require("workbox-webpack-plugin");
 
-module.exports = {
+module.exports = (env, argv) => ({
   entry: "./src/index.tsx",
   output: {
     path: path.resolve(__dirname, "dist"),
@@ -49,8 +50,17 @@ module.exports = {
           from: path.resolve(__dirname, "node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs"),
           to: "maplibre-gl-shared.mjs",
         },
+        { from: path.resolve(__dirname, "public/manifest.json"), to: "manifest.json" },
+        { from: path.resolve(__dirname, "public/icons"), to: "icons" },
       ],
     }),
+    // Service worker only for production builds - running one against the
+    // dev server would add a second, confusing caching layer on top of
+    // webpack-dev-server's own hot-reload, which caused enough grief already
+    // earlier in this project without a service worker involved too.
+    ...(argv.mode === "production"
+      ? [new GenerateSW({ clientsClaim: true, skipWaiting: true })]
+      : []),
   ],
   devServer: {
     port: 5173,
@@ -59,4 +69,4 @@ module.exports = {
       overlay: false,
     },
   },
-};
+});
