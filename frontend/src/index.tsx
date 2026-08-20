@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { setWorkerUrl } from "maplibre-gl";
 import App from "./App";
+import "./app.css";
 
 // Must happen before any Map is created. The worker file is copied verbatim
 // into the build output by CopyWebpackPlugin (see webpack.config.js) rather

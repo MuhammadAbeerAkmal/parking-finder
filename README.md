@@ -4,10 +4,11 @@ A web app showing where you're allowed to park for free vs. where a resident per
 
 ## What it does right now
 
-- Interactive map, color-coded by parking condition (free / ticket / no-stopping / no-parking / residents-only), for central Cologne
+- Interactive map, color-coded by parking condition (free / ticket-or-permit-required / no-stopping-or-parking), for central Cologne
 - Resident-permit zones shown as overlays
-- Click a street or zone for plain-language details
-- "Show only confirmed free" filter
+- Click a street or zone for plain-language details, plus a "Get directions" link to that exact spot
+- Interactive filter/legend - toggle any combination of conditions or permit zones on or off
+- Mobile-friendly: detail view is a full-width bottom sheet on phones, a compact card on desktop
 - Installable as a PWA
 
 ## Goal
@@ -16,7 +17,7 @@ Grow this into a reliable way to find real, verified free/legal street parking -
 
 ## Access
 
-Not deployed yet - for now, run it locally (see Setup below). A live link will be added here once it's deployed.
+Live at **[parking-finder-beige.vercel.app](https://parking-finder-beige.vercel.app)**. To run it locally instead, see Setup below.
 
 ## Setup
 

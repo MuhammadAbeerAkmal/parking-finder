@@ -1,0 +1,26 @@
+/* Mobile-first: the detail panel is a full-width bottom sheet, since that's
+   the reachable, thumb-friendly pattern every real map app uses for
+   tap-for-detail. On wider screens (a real desktop window, not a phone)
+   it becomes a compact floating card instead - inline React styles can't
+   express this breakpoint switch, which is the one thing this file exists
+   for. */
+.detail-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 45vh;
+  overflow-y: auto;
+  border-radius: 12px 12px 0 0;
+}
+
+@media (min-width: 640px) {
+  .detail-sheet {
+    left: auto;
+    right: 16px;
+    bottom: 16px;
+    max-width: 340px;
+    max-height: none;
+    border-radius: 8px;
+  }
+}

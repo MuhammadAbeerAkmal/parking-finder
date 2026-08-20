@@ -4,6 +4,14 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useParkingData } from "./useParkingData";
 import InfoBar from "./InfoBar";
 import SegmentDetailPanel, { SelectedFeature } from "./SegmentDetailPanel";
+import FilterLegend from "./FilterLegend";
+import {
+  BUCKET_RAW_VALUES,
+  CONDITION_BUCKET_COLORS,
+  ConditionBucket,
+  DEFAULT_SEGMENT_COLOR,
+  ZONE_COLOR,
+} from "./theme";
 
 // Raw OSM tile server - fine for local dev, but has usage-policy limits for
 // real traffic. Before a real launch this should move to a proper tile
@@ -22,15 +30,7 @@ const OSM_STYLE: StyleSpecification = {
 };
 
 const COLOGNE_CENTER: [number, number] = [6.9603, 50.9375];
-
-const CONDITION_COLORS: Record<string, string> = {
-  free: "#2e7d32",
-  ticket: "#f9a825",
-  no_stopping: "#c62828",
-  no_parking: "#e53935",
-  residents: "#6a1b9a",
-};
-const DEFAULT_SEGMENT_COLOR = "#757575";
+const ALL_BUCKETS: ConditionBucket[] = ["free", "conditional", "restricted"];
 
 // MapLibre serializes nested-object properties on GeoJSON-source features to
 // JSON strings (vector-tile encoding only supports flat primitives), so
@@ -49,7 +49,10 @@ export default function MapView(): JSX.Element {
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [layersReady, setLayersReady] = useState(false);
-  const [showFreeOnly, setShowFreeOnly] = useState(false);
+  const [visibleBuckets, setVisibleBuckets] = useState<Set<ConditionBucket>>(
+    new Set(ALL_BUCKETS),
+  );
+  const [showZones, setShowZones] = useState(true);
   const [selectedFeature, setSelectedFeature] =
     useState<SelectedFeature | null>(null);
   const parkingData = useParkingData();
@@ -114,13 +117,17 @@ export default function MapView(): JSX.Element {
       id: "zones-fill",
       type: "fill",
       source: "zones",
-      paint: { "fill-color": "#6a1b9a", "fill-opacity": 0.25 },
+      paint: { "fill-color": ZONE_COLOR, "fill-opacity": 0.08 },
     });
     map.addLayer({
       id: "zones-outline",
       type: "line",
       source: "zones",
-      paint: { "line-color": "#6a1b9a", "line-width": 2 },
+      paint: {
+        "line-color": ZONE_COLOR,
+        "line-width": 1.5,
+        "line-opacity": 0.7,
+      },
     });
 
     map.addSource("segments", { type: "geojson", data: parkingData.segments });
@@ -134,15 +141,15 @@ export default function MapView(): JSX.Element {
           "match",
           ["get", "condition_type"],
           "free",
-          CONDITION_COLORS.free,
-          "ticket",
-          CONDITION_COLORS.ticket,
+          CONDITION_BUCKET_COLORS.free,
           "no_stopping",
-          CONDITION_COLORS.no_stopping,
+          CONDITION_BUCKET_COLORS.restricted,
           "no_parking",
-          CONDITION_COLORS.no_parking,
+          CONDITION_BUCKET_COLORS.restricted,
+          "ticket",
+          CONDITION_BUCKET_COLORS.conditional,
           "residents",
-          CONDITION_COLORS.residents,
+          CONDITION_BUCKET_COLORS.conditional,
           DEFAULT_SEGMENT_COLOR,
         ],
       },
@@ -166,6 +173,8 @@ export default function MapView(): JSX.Element {
         name: props.name ?? null,
         conditionType: props.condition_type ?? null,
         conditionTags: parseConditionTags(props.condition_tags),
+        lat: e.lngLat.lat,
+        lng: e.lngLat.lng,
       });
     });
 
@@ -177,32 +186,56 @@ export default function MapView(): JSX.Element {
         zoneName: props.zone_name ?? null,
         zoneAbbreviation: props.zone_abbreviation ?? null,
         infoUrl: props.info_url ?? null,
+        lat: e.lngLat.lat,
+        lng: e.lngLat.lng,
       });
     });
 
     setLayersReady(true);
   }, [mapLoaded, parkingData]);
 
-  // "Show only confirmed-free" filter - hides everything else rather than
-  // just streets, since a visible permit zone while filtering for "free"
-  // would read as contradictory.
+  // Multi-select filter: show only segments whose condition_type falls into
+  // a currently-visible bucket, and toggle zone visibility independently.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !layersReady) return;
 
-    map.setFilter(
-      "segments-line",
-      showFreeOnly ? ["==", ["get", "condition_type"], "free"] : null,
+    const allowedValues = Array.from(visibleBuckets).flatMap(
+      (b) => BUCKET_RAW_VALUES[b],
     );
-    const zonesVisibility = showFreeOnly ? "none" : "visible";
+    map.setFilter("segments-line", [
+      "in",
+      ["get", "condition_type"],
+      ["literal", allowedValues],
+    ]);
+
+    const zonesVisibility = showZones ? "visible" : "none";
     map.setLayoutProperty("zones-fill", "visibility", zonesVisibility);
     map.setLayoutProperty("zones-outline", "visibility", zonesVisibility);
-  }, [showFreeOnly, layersReady]);
+  }, [visibleBuckets, showZones, layersReady]);
+
+  function toggleBucket(bucket: ConditionBucket) {
+    setVisibleBuckets((prev) => {
+      const next = new Set(prev);
+      if (next.has(bucket)) {
+        next.delete(bucket);
+      } else {
+        next.add(bucket);
+      }
+      return next;
+    });
+  }
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100vh" }}>
       <div ref={mapContainer} style={{ width: "100%", height: "100%" }} />
-      <InfoBar showFreeOnly={showFreeOnly} onToggleFreeOnly={setShowFreeOnly} />
+      <InfoBar />
+      <FilterLegend
+        visibleBuckets={visibleBuckets}
+        onToggleBucket={toggleBucket}
+        showZones={showZones}
+        onToggleZones={() => setShowZones((v) => !v)}
+      />
       {selectedFeature && (
         <SegmentDetailPanel
           feature={selectedFeature}
